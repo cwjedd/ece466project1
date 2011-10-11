@@ -386,16 +386,48 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 
 		return false;
 	}  
+
+
 	private boolean foundReturn(ReturnStatement rs){
 		Expression ex = rs.getExpression();
 		dump.println("Return value: "+ex);
 
 		//print code
+		if(ex instanceof BinaryExpression)
+		{
+			int resultReg = genExpressionCode((BinaryExpression)ex);	
+			code.println("store i32 %"+resultReg+", i32* %retval"+(currentRetVal-1));
+			code.println("return_"+currentRetVal+":");
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
+			code.println("ret i32 %retval"+(currentRetVal-1));
+		}
+		else if(ex instanceof Identifier)
+		{
+			code.println("%" + ssaReg++ + " = load i32* %"+((Identifier)ex).getName());
+			
+			code.println("store i32 %"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
+			code.println("return_"+currentRetVal+":");
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
+			code.println("ret i32 %retval"+(currentRetVal-1));
+		}
+		else if(ex instanceof IntegerLiteral)
+		{
+			code.println("%"+ ssaReg++ +" = "+ex.toString());
+			code.println("store i32 %"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
+			code.println("return_"+currentRetVal+":");
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
+			code.println("ret i32 %retval"+(currentRetVal-1));
+		}
+		
+		
+		
+		/*
 		code.println("%"+ ssaReg++ +" = "+ex.toString());
 		code.println("store i32 %"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
 		code.println("return_"+currentRetVal+":");
 		code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
 		code.println("ret i32 %retval"+(currentRetVal-1));
+		*/
 		return false;
 	}
 
@@ -492,7 +524,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			//load from memory into a register
 			setupInstr = setupInstr.append("%" + ssaReg++ + " = load i32* %" +
 					((Identifier)LHS).getName() + "\n");
-			instrBuff = instrBuff.append(", %" + (ssaReg-1));
+			instrBuff = instrBuff.append("%" + (ssaReg-1));
 		}
 
 		//generate code and result registers for right hand size
