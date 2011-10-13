@@ -748,6 +748,8 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			Expression exp = ((ExpressionStatement)o).getExpression();
 			if(exp instanceof AssignmentExpression)
 				assignmentExpression((AssignmentExpression)exp);
+			else if(exp instanceof FunctionCall)
+				functionCall((FunctionCall) exp);				
 		}
 		else if(o instanceof Statement){
 			Statement currentStatement = (Statement) o;
@@ -852,6 +854,11 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			returnReg = commaExpression((CommaExpression)RHS);
 			code.println("store i32 %"+ returnReg +", i32* %"+nameLHS);
 		}
+		else if(RHS instanceof FunctionCall)
+		{
+			returnReg = functionCall((FunctionCall) RHS);
+			code.println("store i32 %"+returnReg+", i32* %"+nameLHS);
+		}
 
 		return returnReg;
 	}
@@ -946,4 +953,38 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		}
 		return returnReg;
 	}	
+	private int functionCall(FunctionCall fc)
+	{
+		String returnType = fc.getReturnType().toString();
+		int beginReg=0, endReg=0;
+		int returnReg = -1;
+		
+		//get function arguments and put in registers
+		if(fc.getNumArguments() != 0)
+			beginReg = ssaReg;
+		for(int i=0;i<fc.getNumArguments();i++)
+		{
+			endReg = ssaReg;
+			code.println("%"+ ssaReg++ + " = load i32* %"+fc.getArgument(i));
+		}
+		
+		//print call code
+		if(returnType.equals("[int]"))
+		{
+			returnReg = ssaReg;
+			code.print("%"+ ssaReg++ + " = ");
+		}
+		code.print("call "+returnType.substring(returnType.indexOf('[')+1, returnType.indexOf(']'))+
+						" @"+fc.getName()+"(");
+		
+		//add args
+		for(int i=beginReg; i<=endReg;i++)
+		{
+			if(i>0)
+				code.print(", ");
+			code.print("i32 %"+i);
+		}
+		code.println(")");
+		return returnReg;
+	}
 }
