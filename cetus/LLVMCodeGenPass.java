@@ -14,7 +14,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	int ifLabel = 0;
 	int loopLabel = 0;
 	PrintWriter dump = new PrintWriter(System.out);     //debug dump output
-	PrintWriter code;
+	PrintWriter code;//= new PrintWriter(System.out);
 	PrintWriter debug = new PrintWriter(System.out);
 
 	protected static final int verbosity = PrintTools.getVerbosity();
@@ -22,7 +22,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	protected LLVMCodeGenPass(Program program, String outputFilename)
 	{
 		super(program);
-		
+
 		try{
 			code = new PrintWriter(new FileWriter(outputFilename));
 		}
@@ -281,12 +281,102 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	}
 	private void forLoop(ForLoop fl){
 		dump.println("For loop found");  
-		Expression 	condi = fl.getCondition();
+		Expression 	lc = fl.getCondition();
 		Statement iStmnt = fl.getInitialStatement();
 		Expression step = fl.getStep();
-		dump.println("For loop conditions: "+condi+"\n");
+		dump.println("For loop conditions: "+lc+"\n");
 		dump.println("For loop initial statement: "+iStmnt.toString());
 		dump.println("For loop step: "+step+"\n");
+		
+		Expression init;
+		
+		//generate initial statement to setup loop
+		if(iStmnt instanceof ExpressionStatement)
+		{
+			init = ((ExpressionStatement)iStmnt).getExpression();
+			
+			AssignmentExpression assn;
+			if(init instanceof AssignmentExpression)
+				assignmentExpression((AssignmentExpression)init);
+		}
+		else System.out.println("ERROR: no expression statement in for loop");
+		
+		if(lc instanceof BinaryExpression)
+		{
+			BinaryExpression exp = (BinaryExpression) lc;
+
+			//generate top of loop label
+			code.println("loop"+loopLabel++ +":");
+
+			int LHSreg = 0;
+			int RHSreg = 0;
+
+			//generate proper registers of values to compare
+			Expression LHS = exp.getLHS();
+			Expression RHS = exp.getRHS();
+			//gen LHS register if needed
+			if(LHS instanceof BinaryExpression)
+				LHSreg = genExpressionCode((BinaryExpression) LHS);
+			else if(LHS instanceof Identifier)
+			{
+				code.println("%" + ssaReg++ + " = load i32* %"+((Identifier)LHS).getName());
+				LHSreg = ssaReg-1;
+			}
+			//gen RHS register if needed
+			if(RHS instanceof BinaryExpression)
+				RHSreg = genExpressionCode((BinaryExpression) RHS);
+			else if(RHS instanceof Identifier)
+			{
+				code.println("%" + ssaReg++ + " = load i32* %"+((Identifier)RHS).getName());
+				RHSreg = ssaReg-1;
+			}
+
+			//generate comparison statement
+			code.print("%"+ ssaReg++ + " = icmp ");		//first part of compare expression
+			//generate type of comparison
+			if(exp.getOperator().toString().trim().equals("<")) code.print("slt ");
+			else if(exp.getOperator().toString().trim().equals(">")) code.print("sgt ");
+			else if(exp.getOperator().toString().trim().equals(">=")) code.print("sge ");
+			else if(exp.getOperator().toString().trim().equals("<=")) code.print("sle ");
+			else if(exp.getOperator().toString().trim().equals("==")) code.print("eq ");
+			else if(exp.getOperator().toString().trim().equals("!=")) code.print("ne ");
+
+			//generate comparison instruction
+			code.print("i32 ");      //+exp.getLHS()+", "+exp.getRHS());
+
+			if(LHS instanceof IntegerLiteral)
+				code.print(((IntegerLiteral) LHS).getValue() + ", ");
+			else
+				code.print("%" + LHSreg + ", ");
+
+			if(RHS instanceof IntegerLiteral)
+				code.println(((IntegerLiteral) RHS).getValue());
+			else
+				code.println("%" + RHSreg);
+
+			//generate branch statement
+			code.println("br i1 %"+(ssaReg-1)+", label %loop"+ loopLabel++ +", label %loop"+ loopLabel++);
+			//generate true label
+			code.println("loop"+(loopLabel-2)+":");
+			//generate loop body
+			FlatIterator forIter = new FlatIterator(fl.getBody());
+			while(forIter.hasNext())
+				genCode(forIter.next());
+			
+			//generate code to update loop variable
+			if(step instanceof CommaExpression)
+				commaExpression((CommaExpression)step);
+			else if(step instanceof AssignmentExpression)
+				assignmentExpression((AssignmentExpression)step);
+			else System.out.println("\n\nERROR in step of for loop\n\n");
+
+			//generate unconditional branch to start of loop and comparison
+			code.println("br label %loop"+ (loopLabel-3));
+
+			//generate end label
+			code.println("loop"+(loopLabel-1) +":");
+		} 
+		else{code.println("_________ERROR: binray expressions only handled for while loop");}
 	}
 	private void whileLoop(WhileLoop wl){
 		dump.println("While loop found");
@@ -549,7 +639,8 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		if(RHS instanceof BinaryExpression)
 		{
 			returnReg = genExpressionCode((BinaryExpression) RHS);
-			new String("store i32 %" + returnReg + ", i32* %" + nameLHS);
+			//new String("store i32 %" + returnReg + ", i32* %" + nameLHS);
+			code.println("store i32 %" + returnReg + ", i32* %" + nameLHS);
 		}
 		else if(RHS instanceof Identifier)
 		{
