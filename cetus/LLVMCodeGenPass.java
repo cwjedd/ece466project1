@@ -575,9 +575,11 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		{
 			Object o = commaIter.next();
 			
-			code.println(o.getClass());
-			
-			if(o instanceof BinaryExpression)
+			if(o instanceof AssignmentExpression)
+			{
+				assignmentExpression((AssignmentExpression) o);
+			}
+			else if(o instanceof BinaryExpression)
 			{
 				returnReg = genExpressionCode((BinaryExpression) o);
 			}
@@ -590,10 +592,6 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			{
 				returnReg = ssaReg++;
 				code.println("%" + returnReg + " = " + ((IntegerLiteral) o).getValue());
-			}
-			else if(o instanceof AssignmentExpression)
-			{
-				assignmentExpression((AssignmentExpression) o);
 			}
 			else if(o instanceof CommaExpression)
 			{
