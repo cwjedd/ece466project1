@@ -93,11 +93,16 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			// dump whatever you want
 		}
 		//w.flush();
+		
+		//add definitions for printf() and scanf()
+		code.println("\n\n");
+		code.println("declare i32 @scanf(i8*, ...)");
+		code.println("declare i32 @printf(i8*, ...)");
 
 		//print all dump and code to screen at end
 		System.out.println("Dump Ouput:");
 		dump.flush();
-		System.out.println("\n\nCode Output:\n");
+		System.out.println("Code Output:\n");
 		code.flush();
 		System.out.println("\n\nDebug Output:\n");
 		debug.flush();
@@ -162,7 +167,9 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 					else 
 					{
 						for (int j = 1; j < dec.getTypeSpecifiers().size(); j++)
-							code.println(dec.getTypeSpecifiers().get(j).toString().trim());
+							code.print(dec.getTypeSpecifiers().get(j).toString().trim());
+						
+						code.println("");
 					}
 				}
 				if (dec.getTypeSpecifiers().size() == 1)
@@ -426,6 +433,9 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			FlatIterator ifIter = new FlatIterator(myIf.getThenStatement());
 			while(ifIter.hasNext())
 				genCode(ifIter.next());
+			
+			if(myIf.getElseStatement() == null)
+				code.println("br label %ifLabel"+ (ifLabel-1));	//branch out of if statement
 
 			//gen code for false condition
 			if(myIf.getElseStatement() != null)
@@ -436,6 +446,8 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				ifIter = new FlatIterator(myIf.getElseStatement());
 				while(ifIter.hasNext())
 					genCode(ifIter.next());
+				
+				code.println("br label %ifLabel"+ (ifLabel-1));	//branch out of if statement
 			}
 			code.println("ifLabel"+(ifLabel-1)+":");		//label for rest of code
 
