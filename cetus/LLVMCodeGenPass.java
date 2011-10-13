@@ -404,7 +404,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		else if(ex instanceof Identifier)
 		{
 			code.println("%" + ssaReg++ + " = load i32* %"+((Identifier)ex).getName());
-			
+
 			code.println("store i32 %"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
 			code.println("return_"+currentRetVal+":");
 			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
@@ -418,9 +418,9 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
-		
-		
-		
+
+
+
 		/*
 		code.println("%"+ ssaReg++ +" = "+ex.toString());
 		code.println("store i32 %"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
@@ -468,14 +468,17 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		}
 	}
 
-	private void assignmentExpression(AssignmentExpression assn)
+	private int assignmentExpression(AssignmentExpression assn)
 	{
 		Identifier var = (Identifier)assn.getLHS();
 		Expression RHS = assn.getRHS();
+		
+		int returnReg = -1;
 
 		if(RHS instanceof BinaryExpression)
 		{
-			code.println("store i32 %" + genExpressionCode((BinaryExpression) RHS) + 
+			returnReg = genExpressionCode((BinaryExpression) RHS);
+			code.println("store i32 %" + returnReg + 
 					", i32* %" + var.getName());
 
 		}
@@ -483,12 +486,26 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		{
 			code.println("%" + ssaReg++ + " = load i32* %"+((Identifier)RHS).getName());
 			code.println("store i32 %"+ (ssaReg-1) + ", i32* %"+var.getName());
+			returnReg = ssaReg - 1;
 		}
 		else if(RHS instanceof IntegerLiteral)
 		{
+			returnReg = ssaReg++;
+			
+			code.println("%" + returnReg + " = " + ((IntegerLiteral)RHS).getValue());
+			
 			code.println("store i32 "+ ((IntegerLiteral)RHS).getValue() +
 					", i32* %"+var.getName());
 		}
+		else if(RHS instanceof CommaExpression)
+		{
+			returnReg = commaExpression((CommaExpression)RHS);
+			
+			code.println("store i32 %"+ returnReg +
+					", i32* %"+var.getName());
+		}
+		
+		return returnReg;
 	}
 
 	private int genExpressionCode(BinaryExpression exp)
@@ -546,5 +563,43 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		code.println(instrBuff);
 
 		return resultReg;
+	}
+	
+	private int commaExpression(CommaExpression ce)
+	{
+		FlatIterator commaIter = new FlatIterator(ce);
+		
+		int returnReg = -1;
+		
+		while(commaIter.hasNext())
+		{
+			Object o = commaIter.next();
+			
+			code.println(o.getClass());
+			
+			if(o instanceof BinaryExpression)
+			{
+				returnReg = genExpressionCode((BinaryExpression) o);
+			}
+			else if(o instanceof Identifier)
+			{
+				code.println("%" + ssaReg++ + " = load i32* %"+((Identifier) o).getName());
+				returnReg = ssaReg - 1;
+			}
+			else if(o instanceof IntegerLiteral)
+			{
+				returnReg = ssaReg++;
+				code.println("%" + returnReg + " = " + ((IntegerLiteral) o).getValue());
+			}
+			else if(o instanceof AssignmentExpression)
+			{
+				assignmentExpression((AssignmentExpression) o);
+			}
+			else if(o instanceof CommaExpression)
+			{
+				returnReg = commaExpression((CommaExpression) o);
+			}
+		}
+		return returnReg;
 	}
 }
