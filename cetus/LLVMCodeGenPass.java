@@ -930,6 +930,15 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
+		else if(ex instanceof FunctionCall)
+		{
+			debug.println("FunctionCall");
+			int resultReg = functionCall((FunctionCall)ex);
+			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal-1));
+			code.println("return_"+currentRetVal+":");
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
+			code.println("ret i32 %retval"+(currentRetVal-1));
+		}
 		
 		
 		
@@ -1425,6 +1434,10 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 					((Identifier)LHS).getName() + "\n");
 			instrBuff = instrBuff.append("%r" + (ssaReg-1));
 		}
+		else if(LHS instanceof FunctionCall)
+		{
+			instrBuff = instrBuff.append("%r" + functionCall((FunctionCall)LHS));
+		}
 
 		//generate code and result registers for right hand size
 		if(RHS instanceof IntegerLiteral)
@@ -1528,7 +1541,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		//add args
 		for(int i=beginReg; i<=endReg;i++)
 		{
-			if(i>0)
+			if(i-beginReg>0)
 				code.print(", ");
 			code.print("i32 %r"+i);
 		}
