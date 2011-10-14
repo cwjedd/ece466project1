@@ -16,9 +16,12 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	int strConst = 0;
 	HashMap ListOfArrays=new HashMap();					// list of arrays
 	HashMap ListOfPointers = new HashMap();				// list of pointers
+	HashMap ListOfStrings = new HashMap();				// list of string literals 
 	PrintWriter dump = new PrintWriter(System.out);     //debug dump output
 	PrintWriter code; //= new PrintWriter(System.out);     //code output
 	PrintWriter debug = new PrintWriter(System.out);
+	
+	
 
 	protected static final int verbosity = PrintTools.getVerbosity();
 
@@ -39,16 +42,34 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 
 	public void start() 
 	{
-
-		/*try
-	{
-	    PrintWriter myWriter = new PrintWriter(new FileWriter("out"));
-	}
-	catch(IOException)
-	{
-	}*/
-
 		// Transform the program here
+		
+		// iterate through all code to find String Literals for printf() and scanf()
+		FlatIterator g = new FlatIterator(program);
+		DepthFirstIterator findStrings = new DepthFirstIterator(g.next());
+		
+		while(findStrings.hasNext())
+		{
+			Object o = findStrings.next();
+			
+			if(o instanceof StringLiteral)
+			{
+				StringLiteral sl = (StringLiteral)o;
+				String fmtString = sl.getValue();
+				
+				if(ListOfStrings.get(fmtString) == null)
+				{
+					ListOfStrings.put(fmtString, strConst++);
+				
+					int numChars = fmtString.length();
+					fmtString = fmtString.concat("\\00");
+					
+					code.println("@.str" + strConst + " = private unnamed_addr constant [" +
+							(numChars+1) + " x i8] c\"" + fmtString + "\"");
+				}
+			}
+		}
+		
 
 		FlatIterator iter = new FlatIterator(program);		//get translation unit
 		iter = new FlatIterator(iter.next());				//iterate on top level of program ie.
@@ -1290,20 +1311,21 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	
 	private int scanfCall(FunctionCall fc)
 	{
-		debug.println("scanf() function found");
-		debug.println(fc.getArgument(0));
+		int strNum;
 		
 		String fmtString = fc.getArgument(0).toString();
 		fmtString = fmtString.substring(fmtString.indexOf('"')+1, fmtString.length());
 		fmtString = fmtString.substring(0, fmtString.indexOf('"'));
 		int numChars = fmtString.length();
+		strNum = Integer.parseInt(ListOfStrings.get(fmtString).toString());
+		
 		fmtString = fmtString.concat("\\00");
 		
-		code.println("@.str" + strConst++ + " = private unnamed_addr constant [" +
-				(numChars+1) + " x i8] c\"" + fmtString + "\"");
+		/*code.println("@.str" + strConst++ + " = private unnamed_addr constant [" +
+				(numChars+1) + " x i8] c\"" + fmtString + "\"");*/
 		
 		code.print("%"+ ssaReg++ + " = call i32 (i8*, ...)* @scanf(i8* getelementptr inbounds ([" +
-				(numChars+1) + " x i8]* @.str" + (strConst-1) + ", i32 0, i32 0)");
+				(numChars+1) + " x i8]* @.str" + strNum + ", i32 0, i32 0)");
 		
 		for(int i=1;i<fc.getNumArguments();i++)
 		{
@@ -1318,17 +1340,21 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	
 	private int printfCall(FunctionCall fc)
 	{
-		debug.println("printf() function found");
+		int strNum;
 		String fmtString = fc.getArgument(0).toString();
 		fmtString = fmtString.substring(fmtString.indexOf('"')+1, fmtString.length());
 		fmtString = fmtString.substring(0, fmtString.indexOf('"'));
 		int numChars = fmtString.length();
+		
+		strNum = Integer.parseInt(ListOfStrings.get(fmtString).toString());
+		debug.println("num"+strNum);
+		
 		fmtString = fmtString.concat("\\00");
 		
 		int beginReg=0, endReg=-1;
 		
-		code.println("@.str" + strConst++ + " = private unnamed_addr constant [" +
-				(numChars+1) + " x i8] c\"" + fmtString + "\"");
+		//code.println("@.str" + strConst++ + " = private unnamed_addr constant [" +
+		//		(numChars+1) + " x i8] c\"" + fmtString + "\"");
 		
 		if(fc.getNumArguments() > 1)
 			beginReg=ssaReg;
@@ -1342,7 +1368,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		}
 		
 		code.print("%"+ ssaReg++ + " = call i32 (i8*, ...)* @printf(i8* getelementptr inbounds ([" +
-				(numChars+1) + " x i8]* @.str" + (strConst-1) + ", i32 0, i32 0)");
+				(numChars+1) + " x i8]* @.str" + strNum + ", i32 0, i32 0)");
 		
 		for(int i=beginReg;i<=endReg;i++)
 		{
