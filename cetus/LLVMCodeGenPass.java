@@ -39,6 +39,15 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 
 	public void start() 
 	{
+
+		/*try
+	{
+	    PrintWriter myWriter = new PrintWriter(new FileWriter("out"));
+	}
+	catch(IOException)
+	{
+	}*/
+
 		// Transform the program here
 
 		FlatIterator iter = new FlatIterator(program);		//get translation unit
@@ -79,7 +88,6 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			dump.flush();
 			System.out.println("\n\nDebug Output:\n");
 			debug.flush();
-			System.out.println("Code Output:\n");
 		}
 
 		//add definitions for printf() and scanf()
@@ -87,7 +95,8 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		code.println("declare i32 @scanf(i8*, ...)");
 		code.println("declare i32 @printf(i8*, ...)");
 
-		//print all code to file
+		//print all dump and code to screen at end
+		
 		code.flush();
 		
 	} 
@@ -209,6 +218,8 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			String arraySpec=null;
 			Declarator dec = varDec.getDeclarator(i);
 			IDExpression id = dec.getID();
+			if(id.getName().toString().equals("printf") || id.getName().toString().equals("scanf"))
+				return;
 			dump.println("Var ID: " + id.getName());
 			//dump.println("Specifiers = " + dec.getSpecifiers());
 			//dump.println("Type Specifiers = " + dec.getTypeSpecifiers());
@@ -247,8 +258,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				init = null;
 			}
 			if (dec.getSpecifiers().equals("[]"))
-				dump.println("int type!");
-
+				dump.println("int type!");				
 			code.print("@"+id.getName());
 
 			if (init == null)
@@ -955,7 +965,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 						code.print("*");
 					}
 					
-					code.println(" %" + nameRHS);
+					code.println(" %" + nameLHS);
 				}
 			} 
 			else {
