@@ -14,6 +14,8 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	int ifLabel = 0;
 	int loopLabel = 0;
 	int strConst = 0;
+	HashMap ListOfArrays=new HashMap();
+	HashMap ListOfPointers = new HashMap();
 	PrintWriter dump = new PrintWriter(System.out);     //debug dump output
 	PrintWriter code; //= new PrintWriter(System.out);     //code output
 	PrintWriter debug = new PrintWriter(System.out);
@@ -119,19 +121,22 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			VariableDeclarator dec = (VariableDeclarator) varDec.getDeclarator(i);
 			IDExpression id = dec.getID();
 			dump.println("Var ID: " + id.getName());
-			String arraySize = dec.getArraySpecifiers().toString().trim();
-			boolean isArray;
+			String arraySize = dec.getArraySpecifiers().toString().trim(); 	//Find the size of the array
+			boolean isArray;  											   	//Declare booleans for later checking
 			boolean is2dArray;
-			String arraySpec=null;
+			String arraySpec=null;											//Array sizes
 
-			try{
+			//try to get the arraySize and pull out just the number. 
+			try{									
 				arraySize = arraySize.substring(2,arraySize.lastIndexOf("]")-1 ).trim();
 				isArray=true;
-				if(arraySize.contains("]["))
+				if(arraySize.contains("]["))				//see if the array is 1 demensional or 2 demensional
 					is2dArray = true;
 				else
 					is2dArray = false;
-				if(is2dArray){
+				
+				//if the array is 2d then break each dimension down into parts. 
+				if(is2dArray){ 
 					String sizeOne = arraySize.substring(0,arraySize.indexOf("]["));
 					String sizeTwo = arraySize.substring(arraySize.indexOf("][")+2);
 					arraySpec= new String("[ "+sizeOne+" ["+sizeTwo+" x i32]]");
@@ -139,7 +144,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 					arraySpec= new String("["+arraySize+" x i32]");
 				}
 			}
-			
+			//if the try fails then the object isn't an array
 			catch(StringIndexOutOfBoundsException e){
 				isArray=false;
 			}
@@ -148,18 +153,16 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				Initializer init = dec.getInitializer();
 				dump.println("Value Init");
 				
-				//local vs global variable declarations
-				/*if(inFunction)
-            	 code.println("%"+id.getName()+"= i32 "+ initVal);
-             else{
-            	 code.println("@"+id.getName()+" common global i32 " + initVal);
-             }*/
-				if(isArray)
+				//if it is an array add it to the list for future reference and allocate it
+				if(isArray){
+					ListOfArrays.put(id.getName(), arraySpec);
 					code.println("%" + id.getName() + " = alloca "+arraySpec);
+				}
 				else
 				{
+					//allocate the space for non-arrays
 					code.print("%" + id.getName() + " = alloca");
-					
+					//if it is an integer type assign it
 					if (dec.getTypeSpecifiers().get(0).toString().equals("int"))
 						code.print(" i32");
 					
@@ -184,6 +187,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				}
 				else // pointers
 				{
+					ListOfPointers.put(id.getName(), dec.getTypeSpecifiers().size());
 					if (init != null)
 					{
 						code.print("store i32");
@@ -945,6 +949,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		else {
 			nameLHS = LHS.toString();
 		}
+		nameRHS = RHS.toString();
 		if(RHS instanceof BinaryExpression)
 		{
 			returnReg = genExpressionCode((BinaryExpression) RHS);
@@ -952,8 +957,30 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		}
 		else if(RHS instanceof Identifier)
 		{
-			code.println("%" + ssaReg++ + " = load i32* %"+((Identifier)RHS).getName());
-			code.println("store i32 %"+ (ssaReg-1) + ", i32* %"+nameLHS);
+			if(ListOfArrays.containsKey(nameRHS)){
+				dump.println("name:"+nameRHS+"key dump: "+ListOfArrays.get(nameRHS));
+				code.println("%" + ssaReg++ + " = getelementptr inbounds "+ListOfArrays.get(nameRHS)+"* %"+nameRHS+", i32 0, i32 0");
+				if (ListOfPointers.containsKey(nameLHS))
+				{
+					code.print("store i32");
+
+					for (int i = 1; i < Integer.parseInt(ListOfPointers.get(nameLHS).toString()); i++) {
+						code.print("*");
+					}
+
+					code.print(" %" + (ssaReg - 1) + ", i32");
+					
+					for (int i = 0; i < Integer.parseInt(ListOfPointers.get(nameLHS).toString()); i++) {
+						code.print("*");
+					}
+					
+					code.println(" %" + nameRHS);
+				}
+			} 
+			else {
+				code.println("%" + ssaReg++ + " = load i32* %"+((Identifier)RHS).getName());
+				code.println("store i32 %"+ (ssaReg-1) + ", i32* %"+nameLHS);
+			}
 			returnReg = ssaReg - 1;
 		}
 		else if(RHS instanceof ArrayAccess){
@@ -981,15 +1008,65 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		}
 		else if(RHS instanceof IntegerLiteral)
 		{
+			//debug.println(LHS);
+			String LHSsubstring;
+			int derefCount = 0;
+			
+			try{
+				LHSsubstring = LHS.toString().substring(2,LHS.toString().length());
+			}
+			catch (Exception e)
+			{
+				LHSsubstring = "";
+			}
+			
+			System.out.println(LHSsubstring);
+			
+			if (LHSsubstring.startsWith("*") || LHSsubstring.startsWith("("))
+			{
+				while (LHSsubstring.startsWith("*") || LHSsubstring.startsWith("("))
+				{
+					try{
+						//debug.println(LHSsubstring);
+						LHSsubstring = LHSsubstring.substring(LHSsubstring.indexOf("*") + 2,LHSsubstring.length());
+						derefCount++;
+					}
+					catch (Exception e)
+					{
+						break;
+					}
+				}
+				//debug.println(derefCount);
+				for (int i = derefCount; i > 0; i--)
+				{
+					code.print("%" + ssaReg++ + " = load i32");
+
+					for (int j = 0; j <= i; j++)
+						code.print("*");
+
+					code.print(" %");
+
+					if (i == derefCount)
+						code.println(nameLHS.substring(nameLHS.lastIndexOf("*") + 2,nameLHS.lastIndexOf("*") + 3));
+					else
+						code.println(ssaReg - 2);
+				}
+				
+				code.println("store i32 "+ ((IntegerLiteral)RHS).getValue() + ", i32* %" + (ssaReg - 1));
+			}
+			else
+			{
+				code.println("store i32 "+ ((IntegerLiteral)RHS).getValue() + ", i32* %"+nameLHS);
+			}
 			returnReg = ssaReg++;
-			code.println("%" + returnReg + " = " + ((IntegerLiteral)RHS).getValue());
+			code.println("%" + returnReg + " = add i32 0, " + ((IntegerLiteral)RHS).getValue());
 			code.println("store i32 "+ ((IntegerLiteral)RHS).getValue() + ", i32* %"+nameLHS);
 		}
 		else if(RHS instanceof CommaExpression){
 			returnReg = commaExpression((CommaExpression)RHS);
 			code.println("store i32 %"+ returnReg +", i32* %"+nameLHS);
 		}
-else if(RHS instanceof FunctionCall)
+		else if(RHS instanceof FunctionCall)
 		{
 			returnReg = functionCall((FunctionCall) RHS);
 			code.println("store i32 %"+returnReg+", i32* %"+nameLHS);
