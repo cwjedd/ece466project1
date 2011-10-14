@@ -47,30 +47,30 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		// iterate through all code to find String Literals for printf() and scanf()
 		FlatIterator g = new FlatIterator(program);
 		DepthFirstIterator findStrings = new DepthFirstIterator(g.next());
-		
 		while(findStrings.hasNext())
 		{
 			Object o = findStrings.next();
-			
+			// if string literal add to string constants for code
 			if(o instanceof StringLiteral)
 			{
 				StringLiteral sl = (StringLiteral)o;
 				String fmtString = sl.getValue();
-				
+				//if string does not already exist add to hash map
 				if(ListOfStrings.get(fmtString) == null)
 				{
-					ListOfStrings.put(fmtString, strConst++);
+					ListOfStrings.put(fmtString, strConst);
 				
 					int numChars = fmtString.length();
 					fmtString = fmtString.concat("\\00");
 					
-					code.println("@.str" + strConst + " = private unnamed_addr constant [" +
+					//print string constant to code
+					code.println("@.str" + strConst++ + " = private unnamed_addr constant [" +
 							(numChars+1) + " x i8] c\"" + fmtString + "\"");
 				}
 			}
 		}
 		
-
+		//begin codeing rest of program
 		FlatIterator iter = new FlatIterator(program);		//get translation unit
 		iter = new FlatIterator(iter.next());				//iterate on top level of program ie.
 		//global vars and procedures
@@ -1313,20 +1313,23 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	{
 		int strNum;
 		
+		//get format String Argument and trim
 		String fmtString = fc.getArgument(0).toString();
 		fmtString = fmtString.substring(fmtString.indexOf('"')+1, fmtString.length());
 		fmtString = fmtString.substring(0, fmtString.indexOf('"'));
 		int numChars = fmtString.length();
+		
+		//find format string in list of constant strings
 		strNum = Integer.parseInt(ListOfStrings.get(fmtString).toString());
 		
+		//append end of string character to format string
 		fmtString = fmtString.concat("\\00");
 		
-		/*code.println("@.str" + strConst++ + " = private unnamed_addr constant [" +
-				(numChars+1) + " x i8] c\"" + fmtString + "\"");*/
-		
+		//print first part of call to scanf()
 		code.print("%"+ ssaReg++ + " = call i32 (i8*, ...)* @scanf(i8* getelementptr inbounds ([" +
 				(numChars+1) + " x i8]* @.str" + strNum + ", i32 0, i32 0)");
 		
+		//add args to scanf() call
 		for(int i=1;i<fc.getNumArguments();i++)
 		{
 			String arg = fc.getArgument(i).toString();
@@ -1341,24 +1344,25 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	private int printfCall(FunctionCall fc)
 	{
 		int strNum;
+		
+		//get format string arument
 		String fmtString = fc.getArgument(0).toString();
 		fmtString = fmtString.substring(fmtString.indexOf('"')+1, fmtString.length());
 		fmtString = fmtString.substring(0, fmtString.indexOf('"'));
 		int numChars = fmtString.length();
 		
+		//compare to list of available constant strings
 		strNum = Integer.parseInt(ListOfStrings.get(fmtString).toString());
-		debug.println("num"+strNum);
 		
+		//add string terminator character to format string
 		fmtString = fmtString.concat("\\00");
 		
 		int beginReg=0, endReg=-1;
 		
-		//code.println("@.str" + strConst++ + " = private unnamed_addr constant [" +
-		//		(numChars+1) + " x i8] c\"" + fmtString + "\"");
-		
 		if(fc.getNumArguments() > 1)
 			beginReg=ssaReg;
 		
+		//generate load instructions to load data to be printed into registers
 		for(int i=1;i<fc.getNumArguments();i++)
 		{
 			endReg = ssaReg;
@@ -1367,9 +1371,11 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			code.println("%"+ ssaReg++ + " = load i32* %" + arg);
 		}
 		
+		//print call to printf()
 		code.print("%"+ ssaReg++ + " = call i32 (i8*, ...)* @printf(i8* getelementptr inbounds ([" +
 				(numChars+1) + " x i8]* @.str" + strNum + ", i32 0, i32 0)");
 		
+		//add args to printf() call
 		for(int i=beginReg;i<=endReg;i++)
 		{
 			code.print(", i32 %" + i);
