@@ -16,6 +16,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	int ifLabel = 0;
 	int loopLabel = 0;
 	int strConst = 0;
+	int returnCount = 0;
 	HashMap ListOfArrays=new HashMap();					// list of arrays
 	HashMap ListOfPointers = new HashMap();				// list of pointers
 	HashMap ListOfStrings = new HashMap();				// list of string literals 
@@ -421,7 +422,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		
 		//generate labels
 		trueLabel = ifLabel++;
-		if(myIf.getElseStatement() == null)
+		if(myIf.getElseStatement() != null)
 			elseLabel = ifLabel++;
 		
 		exitLabel = ifLabel++;
@@ -857,6 +858,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		CompoundStatement cs = proc.getBody();
 		//dump.println("There are "+cs.countStatements()+" statements in this function.");
 		parameters.clear();				//clear parameters for new function
+		returnCount=0;
 
 		//create code
 		if (!(proc.getParameters().isEmpty() || proc.getParameter(0).toString().equals("void ")))
@@ -925,52 +927,44 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	private boolean foundReturn(ReturnStatement rs){
 		Expression ex = rs.getExpression();
 		dump.println("Return value: "+ex);
+		returnCount++;
 
 		//print code
 		if(ex instanceof BinaryExpression)
 		{
 			int resultReg = genExpressionCode((BinaryExpression)ex);	
-			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal-1));
+			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal-returnCount));
 			//code.println("return_"+currentRetVal+":");
-			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
 		else if(ex instanceof Identifier)
 		{
 			code.println("%r" + ssaReg++ + " = load i32* %"+((Identifier)ex).getName());
 		
-			code.println("store i32 %r"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
+			code.println("store i32 %r"+(ssaReg-1)+", i32* %retval"+(currentRetVal-returnCount));
 			//code.println("return_"+currentRetVal+":");
-			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
 		else if(ex instanceof IntegerLiteral)
 		{
 			code.println("%r" + ssaReg++ +" = add i32 0, "+ex.toString());
-			code.println("store i32 %r"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
+			code.println("store i32 %r"+(ssaReg-1)+", i32* %retval"+(currentRetVal-returnCount));
 			//code.println("return_"+currentRetVal+":");
-			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
 		else if(ex instanceof FunctionCall)
 		{
 			debug.println("FunctionCall");
 			int resultReg = functionCall((FunctionCall)ex);
-			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal-1));
+			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal-returnCount));
 			//code.println("return_"+currentRetVal+":");
-			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
 		
-		
-		
-		/*
-		code.println("%r" + ssaReg++ +" = "+ex.toString());
-		code.println("store i32 %"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
-		//code.println("return_"+currentRetVal+":");
-		code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
-		code.println("ret i32 %retval"+(currentRetVal-1));
-		*/
 		return false;
 	}
 
@@ -1054,9 +1048,9 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				 String nameOfArray = nameLHS;
 				nameLHS = Integer.toString(ssaReg);
 				if(LHSArrayLocation.equals(LHSArrayLocation1))
-					code.println("%r"+ssaReg++ +" = getelementptr inbounds "+ListOfArrays.get(nameOfArray)+"* %"+nameOfArray+", i32 "+LHSArrayLocation1);
+					code.println("%r"+ssaReg++ +" = getelementptr inbounds "+ListOfArrays.get(nameOfArray)+"* %"+nameOfArray+", i32 0, i32 "+LHSArrayLocation1);
 				else
-					code.println("%r"+ssaReg++ +" = getelementptr inbounds "+ListOfArrays.get(nameOfArray)+"* %"+nameOfArray+", i32 "+LHSArrayLocation1);
+					code.println("%r"+ssaReg++ +" = getelementptr inbounds "+ListOfArrays.get(nameOfArray)+"* %"+nameOfArray+", i32 0, i32 "+LHSArrayLocation1);
 			}
 			else if (LHSIs2dArray){			// otherwise if left hand side is 2d array
 				String nameOfArray = nameLHS;
@@ -1133,7 +1127,14 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 						code.print("*");
 					}
 				
-					code.println(" %" + nameLHS.toString());
+					try{
+						Integer.parseInt(nameLHS);
+						code.println(" %r" + nameLHS);
+					}
+					catch (Exception e)
+					{
+						code.println(" %" + nameLHS);
+					}
 			}			
 		}
 		else if(RHS instanceof Identifier)
@@ -1525,7 +1526,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			
 			if(o instanceof AssignmentExpression)	// if assignment
 			{
-				assignmentExpression((AssignmentExpression) o);
+				returnReg = Integer.toString(assignmentExpression((AssignmentExpression) o));
 			}
 			else if(o instanceof BinaryExpression)	// if math equation
 			{
@@ -1595,8 +1596,12 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			returnReg = ssaReg;
 			code.print("%r" + ssaReg++ + " = ");
 		}
-		code.print("call "+returnType.substring(returnType.indexOf('[')+1, returnType.indexOf(']'))+
-						" @"+fc.getName()+"(");
+		code.print("call ");
+
+		if(returnType.substring(returnType.indexOf('[')+1, returnType.indexOf(']')).equals("int"))
+			code.print("i32 @"+fc.getName()+"(");
+		else
+			code.print("void @"+fc.getName()+"(");
 		
 		//add args
 		for(int i=beginReg; i<=endReg;i++)
