@@ -924,7 +924,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		{
 			code.println("br label %return_"+retLabel);
 			code.println("return_"+ retLabel++ +":");
-			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
+			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2-returnCount));
 			code.println("ret i32 %retval"+(currentRetVal-1));		//print return code
 		}
 
