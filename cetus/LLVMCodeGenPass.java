@@ -918,7 +918,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		{
 			int resultReg = genExpressionCode((BinaryExpression)ex);	
 			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal-1));
-			code.println("return_"+currentRetVal+":");
+			//code.println("return_"+currentRetVal+":");
 			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
@@ -927,7 +927,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			code.println("%r" + ssaReg++ + " = load i32* %"+((Identifier)ex).getName());
 		
 			code.println("store i32 %r"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
-			code.println("return_"+currentRetVal+":");
+			//code.println("return_"+currentRetVal+":");
 			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
@@ -944,7 +944,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			debug.println("FunctionCall");
 			int resultReg = functionCall((FunctionCall)ex);
 			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal-1));
-			code.println("return_"+currentRetVal+":");
+			//code.println("return_"+currentRetVal+":");
 			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
 			code.println("ret i32 %retval"+(currentRetVal-1));
 		}
@@ -954,7 +954,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		/*
 		code.println("%r" + ssaReg++ +" = "+ex.toString());
 		code.println("store i32 %"+(ssaReg-1)+", i32* %retval"+(currentRetVal-1));
-		code.println("return_"+currentRetVal+":");
+		//code.println("return_"+currentRetVal+":");
 		code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-2));
 		code.println("ret i32 %retval"+(currentRetVal-1));
 		*/
