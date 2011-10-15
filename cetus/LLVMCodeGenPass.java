@@ -410,12 +410,22 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 	}    
 
 	private void ifStatement(IfStatement myIf){
+		int trueLabel=-1;
+		int elseLabel=-1;
+		int exitLabel=-1;
 		dump.println("Found if statement");
 		Expression terms = myIf.getControlExpression();
 		dump.println("If conditions: "+terms.toString()+"\n");
 		Statement elseStmt = myIf.getThenStatement();
 		dump.println("then statement: "+elseStmt.toString()+"\n");
-
+		
+		//generate labels
+		trueLabel = ifLabel++;
+		if(myIf.getElseStatement() == null)
+			elseLabel = ifLabel++;
+		
+		exitLabel = ifLabel++;
+		
 		boolean LHSIsArray = false;
 		boolean LHSIs2dArray = false;
 		boolean RHSIsArray = false;
@@ -561,8 +571,11 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				else
 					code.println("%r" + RHSreg);
 			}
-			code.println("br i1 %r"+(ssaReg-1)+", label %ifLabel"+ ifLabel++ +", label %ifLabel"+ ifLabel++);
-			code.println("ifLabel"+(ifLabel-2)+":");		//label for true condition
+			if(elseLabel == -1)		//no else statement
+				code.println("br i1 %r"+(ssaReg-1)+", label %ifLabel"+ trueLabel +", label %ifLabel"+exitLabel);
+			else
+				code.println("br i1 %r"+(ssaReg-1)+", label %ifLabel"+ trueLabel +", label %ifLabel"+elseLabel);
+			code.println("ifLabel"+trueLabel+":");		//label for true condition
 
 			//gen code for true condition
 			FlatIterator ifIter = new FlatIterator(myIf.getThenStatement());
@@ -570,21 +583,21 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				genCode(ifIter.next());
 			
 			if(myIf.getElseStatement() == null)
-				code.println("br label %ifLabel"+ (ifLabel-1));	//branch out of if statement
+				code.println("br label %ifLabel"+ exitLabel);	//branch out of if statement
 
 			//gen code for false condition
 			if(myIf.getElseStatement() != null)
 			{
-				code.println("br label %ifLabel"+ ifLabel++);	// branch to outside of whole statement
+				code.println("br label %ifLabel"+ exitLabel);	// branch to outside of whole statement
 
-				code.println("ifLabel"+(ifLabel-2)+":");		//false label condiditon
+				code.println("ifLabel"+elseLabel+":");		//false label condiditon
 				ifIter = new FlatIterator(myIf.getElseStatement());
 				while(ifIter.hasNext())
 					genCode(ifIter.next());
 				
-				code.println("br label %ifLabel"+ (ifLabel-1));	//branch out of if statement
+				code.println("br label %ifLabel"+ exitLabel);	//branch out of if statement
 			}
-			code.println("ifLabel"+(ifLabel-1)+":");		//label for rest of code
+			code.println("ifLabel"+exitLabel+":");		//label for rest of code
 
 		} else {code.println("ERROR: Unhandeled if statement condition not binary expression");}
 	}
@@ -1039,7 +1052,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			}
 			if(!LHSIs2dArray){				// if left hand side is not a 2d array
 				 String nameOfArray = nameLHS;
-				nameLHS = new String(nameLHS+"_"+LHSArrayLocation);
+				nameLHS = Integer.toString(ssaReg);
 				if(LHSArrayLocation.equals(LHSArrayLocation1))
 					code.println("%r"+ssaReg++ +" = getelementptr inbounds "+ListOfArrays.get(nameOfArray)+"* %"+nameOfArray+", i32 "+LHSArrayLocation1);
 				else
@@ -1119,7 +1132,8 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 					for (int i = 1; i < Integer.parseInt(ListOfPointers.get(nameLHS).toString()); i++) { 	// count number of references
 						code.print("*");
 					}
-				code.println(" %r" + (returnReg+1));
+				
+					code.println(" %" + nameLHS.toString());
 			}			
 		}
 		else if(RHS instanceof Identifier)
