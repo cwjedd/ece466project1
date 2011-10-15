@@ -922,6 +922,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		//generate return code
 		if(retType.equals("int"))
 		{
+			code.println("br label %return_"+retLabel);
 			code.println("return_"+ retLabel++ +":");
 			code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			code.println("ret i32 %retval"+(currentRetVal-1));		//print return code
@@ -945,7 +946,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		{
 			int resultReg = genExpressionCode((BinaryExpression)ex);	
 			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal++ - returnCount));
-			code.println("br label %return"+retLabel);
+			code.println("br label %return_"+retLabel);
 			//code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			//code.println("ret i32 %retval"+(currentRetVal-1));
 		}
@@ -954,7 +955,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			code.println("%r" + ssaReg++ + " = load i32* %"+((Identifier)ex).getName());
 		
 			code.println("store i32 %r"+(ssaReg-1)+", i32* %retval"+(currentRetVal++ - returnCount));
-			code.println("br label %return"+retLabel);
+			code.println("br label %return_"+retLabel);
 			//code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			//code.println("ret i32 %retval"+(currentRetVal-1));
 		}
@@ -962,7 +963,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		{
 			code.println("%r" + ssaReg++ +" = add i32 0, "+ex.toString());
 			code.println("store i32 %r"+(ssaReg-1)+", i32* %retval"+(currentRetVal++ - returnCount));
-			code.println("br label %return"+retLabel);
+			code.println("br label %return_"+retLabel);
 			//code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			//code.println("ret i32 %retval"+(currentRetVal-1));
 		}
@@ -971,7 +972,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			debug.println("FunctionCall");
 			int resultReg = functionCall((FunctionCall)ex);
 			code.println("store i32 %r"+resultReg+", i32* %retval"+(currentRetVal++ - returnCount));
-			code.println("br label %return"+retLabel);
+			code.println("br label %return_"+retLabel);
 			//code.println("%retval"+ currentRetVal++ +" = load i32* %retval"+(currentRetVal-1-returnCount));
 			//code.println("ret i32 %retval"+(currentRetVal-1));
 		}
