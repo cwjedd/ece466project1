@@ -1198,7 +1198,10 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				
 				code.println("%r" + ssaReg++ + " = load i32* %"+((Identifier)RHS).getName());
 				
-				code.println("store i32 %r"+ (ssaReg-1) + ", i32* %"+((Identifier)LHS).getName());
+				if(!(LHS instanceof ArrayAccess))
+					code.println("store i32 %r"+ (ssaReg-1) + ", i32* %"+((Identifier)LHS).getName());
+				else
+					code.println("store i32 %r" + (ssaReg-1) + ", i32* %r" + (ssaReg-2));
 			}
 			returnReg = ssaReg - 1;
 		}
