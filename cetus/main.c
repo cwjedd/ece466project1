@@ -1,15 +1,24 @@
-int x, y, z;
+#include "helper.h"
 
-int foo1() {
-  return 5;
-}
+int main()
 
-int j;
+{
 
-int foo2() {
-  return 5;
-}
+  int a;
 
-int main() {
+
+
+  int x[10];
+
+
+  x[5] = 2;
+
+  a = x[5];
+
+  printf("%d ",a);
+
+
+
   return 0;
+
 }
