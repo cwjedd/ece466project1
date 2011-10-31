@@ -1224,7 +1224,15 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				code.println("%"+nameAA+" = getelementptr inbounds "+ListOfArrays.get(nameRHS)+"* %"+nameRHS+", i32 "+RHSArrayLocation+", i32 "+RHSArrayLocation2);
 			}
 				dump.println("nl:"+nameLHS);
-				code.println("%"+nameLHS+" = load i32* "+nameAA);
+				
+				if(LHS instanceof Identifier)
+				{
+					//code.println("%"+nameLHS+" = load i32* "+nameAA);
+					code.println("%r" + ssaReg++ + " = load i32* "+nameAA);
+					code.println("store i32 %r" + (ssaReg-1) +", i32* %"+nameLHS);
+				}
+				else
+					code.println("%"+nameLHS+" = load i32* "+nameAA);
 			
 		}
 		else if(RHS instanceof IntegerLiteral)
@@ -1277,7 +1285,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			}
 			else
 			{
-				code.println("store i32 "+ ((IntegerLiteral)RHS).getValue() + ", i32* %"+nameLHS);
+				code.println("store i32 "+ ((IntegerLiteral)RHS).getValue() + ", i32* %r"+nameLHS);
 			}
 			returnReg = ssaReg++;
 			code.println("%r" + returnReg + " = add i32 0, " + ((IntegerLiteral)RHS).getValue());
