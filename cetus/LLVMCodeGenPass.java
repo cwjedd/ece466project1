@@ -39,7 +39,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 		}
 		catch(Exception e)
 		{
-			System.out.println("\n\nERROR:  unable to create output file\n");
+			//Sytem.out.println("\n\nERROR:  unable to create output file\n");
 		}
 	}
 
@@ -119,10 +119,10 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 
 		if(verbosity>0)
 		{	
-			System.out.println("Dump Ouput:");
-			dump.flush();
-			System.out.println("\n\nDebug Output:\n");
-			debug.flush();
+			//Sytem.out.println("Dump Ouput:");
+			//dump.flush();
+			//System.out.println("\n\nDebug Output:\n");
+			//debug.flush();
 		}
 
 		//add definitions for printf() and scanf()
@@ -234,7 +234,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			}  
 
 			catch(ClassCastException e) {
-				System.out.println("Exception finding local Variables");
+				//Sytem.out.println("Exception finding local Variables");
 			}        
 
 		}
@@ -629,7 +629,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			if(init instanceof AssignmentExpression)
 				assignmentExpression((AssignmentExpression)init);
 		}
-		else System.out.println("ERROR: no expression statement in for loop");
+		else ; //Sytem.out.println("ERROR: no expression statement in for loop");
 
 		if(lc instanceof BinaryExpression)
 		{
@@ -699,7 +699,7 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				commaExpression((CommaExpression)step);
 			else if(step instanceof AssignmentExpression)
 				assignmentExpression((AssignmentExpression)step);
-			else System.out.println("\n\nERROR in step of for loop\n\n");
+			else ;//Sytem.out.println("\n\nERROR in step of for loop\n\n");
 
 			//generate unconditional branch to start of loop and comparison
 			code.println("br label %loop"+ (loopLabel-3));
