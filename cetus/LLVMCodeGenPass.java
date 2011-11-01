@@ -1205,10 +1205,20 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 			returnReg = ssaReg - 1;
 		}
 		else if(RHS instanceof ArrayAccess){	// if right hand side is not a 2d array
+			String LHSsubstring;
+			int derefCount = 0;
 			String nameAA;
 			ArrayAccess aR = (ArrayAccess) RHS;
 			nameRHS = aR.getArrayName().toString();
 			RHSArrayLocation=aR.getIndices().get(0).toString();
+			
+			try{
+				LHSsubstring = LHS.toString().substring(2,LHS.toString().length());
+			}
+			catch (Exception e)
+			{
+				LHSsubstring = "";
+			}
 			
 			if(aR.getNumIndices() > 1) {
 				RHSIs2dArray = true;
@@ -1223,17 +1233,46 @@ public class LLVMCodeGenPass extends cetus.analysis.AnalysisPass
 				nameAA = new String(nameRHS+"_"+RHSArrayLocation+"_"+RHSArrayLocation2);
 				code.println("%"+nameAA+" = getelementptr inbounds "+ListOfArrays.get(nameRHS)+"* %"+nameRHS+", i32 "+RHSArrayLocation+", i32 "+RHSArrayLocation2);
 			}
-				dump.println("nl:"+nameLHS);
-				
-				if(LHS instanceof Identifier)
+			dump.println("nl:"+nameLHS);
+
+			if (LHSsubstring.startsWith("*") || LHSsubstring.startsWith("("))
+			{
+				while (LHSsubstring.startsWith("*") || LHSsubstring.startsWith("("))
 				{
-					//code.println("%"+nameLHS+" = load i32* "+nameAA);
-					code.println("%r" + ssaReg++ + " = load i32* "+nameAA);
-					code.println("store i32 %r" + (ssaReg-1) +", i32* %"+nameLHS);
+					try{
+						LHSsubstring = LHSsubstring.substring(LHSsubstring.indexOf("*") + 2,LHSsubstring.length());
+						derefCount++;
+					}
+					catch (Exception e)
+					{
+						break;
+					}
 				}
-				else
-					code.println("%"+nameLHS+" = load i32* "+nameAA);
-			
+				
+				code.println("%r" + ssaReg++ + " = load i32* "+nameAA);
+				
+				for (int i = derefCount; i > 0; i--)
+				{
+					code.print("%r" + ssaReg++ + " = load i32");
+
+					for (int j = 0; j <= i; j++)
+						code.print("*");
+
+					code.print(" %");
+
+					if (i == derefCount)
+						code.println(nameLHS = nameLHS.substring(nameLHS.lastIndexOf("*") + 2, nameLHS.indexOf(")")));
+					else
+						code.println("r"+(ssaReg - 2));
+				}
+				dump.println("derefCount = " + derefCount);
+				code.println("store i32 %r" + (ssaReg - (derefCount + 1)) + ", i32* %r" + (ssaReg - 1));
+			}
+			else
+			{
+				code.println("%"+nameLHS+" = load i32* %"+nameAA);
+			}
+			returnReg = ssaReg;		
 		}
 		else if(RHS instanceof IntegerLiteral)
 		{
